@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🐍 Snake Game — Arc Testnet</title>
+  <style>
+    body {
+      background-color: #0d1117;
+      color: #fff;
+      font-family: "Poppins", sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+    }
+    canvas {
+      border: 3px solid #00c8ff;
+      background: #161b22;
+    }
+    h1 {
+      color: #00c8ff;
+    }
+    #score {
+      font-size: 1.2em;
+      margin: 10px;
+    }
+    button {
+      background-color: #00c8ff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 1em;
+      color: #fff;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    button:hover {
+      background-color: #009ed1;
+    }
+  </style>
+</head>
+<body>
+  <h1>🐍 Snake Game</h1>
+  <canvas id="game" width="400" height="400"></canvas>
+  <div id="score">Score: 0</div>
+  <button id="mintBtn">Mintar Score NFT</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <script>
+    const canvas = document.getElementById("game");
+    const ctx = canvas.getContext("2d");
+    const box = 20;
+    let snake = [{ x: 9 * box, y: 10 * box }];
+    let direction = null;
+    let food = {
+      x: Math.floor(Math.random() * 19 + 1) * box,
+      y: Math.floor(Math.random() * 19 + 1) * box
+    };
+    let score = 0;
+    let game;
+
+    document.addEventListener("keydown", directionControl);
+
+    function directionControl(event) {
+      if (event.keyCode == 37 && direction != "RIGHT") direction = "LEFT";
+      else if (event.keyCode == 38 && direction != "DOWN") direction = "UP";
+      else if (event.keyCode == 39 && direction != "LEFT") direction = "RIGHT";
+      else if (event.keyCode == 40 && direction != "UP") direction = "DOWN";
+    }
+
+    function collision(newHead, snakeArray) {
+      return snakeArray.some(
+        (segment) => segment.x === newHead.x && segment.y === newHead.y
+      );
+    }
+
+    function drawGame() {
+      ctx.fillStyle = "#161b22";
+      ctx.fillRect(0, 0, 400, 400);
+
+      for (let i = 0; i < snake.length; i++) {
+        ctx.fillStyle = i === 0 ? "#00c8ff" : "#00ffaa";
+        ctx.fillRect(snake[i].x, snake[i].y, box, box);
+      }
+
+      ctx.fillStyle = "red";
+      ctx.fillRect(food.x, food.y, box, box);
+
+      let snakeX = snake[0].x;
+      let snakeY = snake[0].y;
+
+      if (direction === "LEFT") snakeX -= box;
+      if (direction === "UP") snakeY -= box;
+      if (direction === "RIGHT") snakeX += box;
+      if (direction === "DOWN") snakeY += box;
+
+      if (snakeX === food.x && snakeY === food.y) {
+        score++;
+        document.getElementById("score").textContent = `Score: ${score}`;
+        food = {
+          x: Math.floor(Math.random() * 19 + 1) * box,
+          y: Math.floor(Math.random() * 19 + 1) * box
+        };
+      } else {
+        snake.pop();
+      }
+
+      let newHead = { x: snakeX, y: snakeY };
+
+      if (
+        snakeX < 0 ||
+        snakeX >= 400 ||
+        snakeY < 0 ||
+        snakeY >= 400 ||
+        collision(newHead, snake)
+      ) {
+        clearInterval(game);
+        alert(`Game Over! Seu Score: ${score}`);
+      }
+
+      snake.unshift(newHead);
+    }
+
+    game = setInterval(drawGame, 120);
+
+    // 🔗 Blockchain Mint
+    const CONTRACT_ADDRESS = "0x9C356219b2492b2565448fe24139d2f8BFEb6D63";
+    const CONTRACT_ABI = [
+      "function mintScore(string memory uri) public returns (uint256)"
+    ];
+
+    document.getElementById("mintBtn").onclick = async () => {
+      if (!window.ethereum) {
+        alert("Instale o MetaMask ou Rabby primeiro!");
+        return;
+      }
+
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+        const playerAddress = await signer.getAddress();
+        const uriData = JSON.stringify({
+          player: playerAddress,
+          score: score,
+          timestamp: new Date().toISOString()
+        });
+
+        const tx = await contract.mintScore(uriData);
+        alert("Transação enviada! Aguardando confirmação...");
+        await tx.wait();
+        alert(`NFT mintado com sucesso! 🎉\nTx Hash: ${tx.hash}`);
+      } catch (err) {
+        console.error(err);
+        alert("❌ Erro ao mintar NFT: " + err.message);
+      }
+    };
+  </script>
+</body>
+</html>
