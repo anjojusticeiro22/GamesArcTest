@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>♛ Eight Queens — Arc Testnet</title>
+  <style>
+    body {
+      font-family: "Poppins", sans-serif;
+      background: #0d1117;
+      color: #fff;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+    }
+    h1 {
+      color: #00c8ff;
+      margin: 20px;
+    }
+    #board {
+      display: grid;
+      grid-template-columns: repeat(8, 50px);
+      grid-template-rows: repeat(8, 50px);
+      gap: 2px;
+    }
+    .cell {
+      width: 50px;
+      height: 50px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      font-size: 24px;
+      transition: 0.2s;
+    }
+    .cell.blocked {
+      background: rgba(255, 0, 0, 0.4);
+    }
+    .cell.queen {
+      background: #00c8ff;
+    }
+    #status {
+      margin: 10px;
+      color: #00ffaa;
+    }
+    button {
+      margin-top: 15px;
+      background-color: #00c8ff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px 20px;
+      font-size: 1em;
+      color: #fff;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #009ed1;
+    }
+  </style>
+</head>
+<body>
+  <h1>♛ Eight Queens Challenge</h1>
+  <div id="board"></div>
+  <div id="status">Coloque 8 rainhas sem que se ataquem!</div>
+  <button id="mintBtn">Mintar NFT</button>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
+  <script>
+    const board = document.getElementById("board");
+    const statusDiv = document.getElementById("status");
+    const CONTRACT_ADDRESS = "0x729abA65933f5663e0A55EF65A70feC97a8a0af9";
+    const CONTRACT_ABI = ["function mintScore(string memory tokenURI) public returns (uint256)"];
+    let queens = [];
+
+    for (let i = 0; i < 64; i++) {
+      const cell = document.createElement("div");
+      cell.classList.add("cell");
+      cell.dataset.index = i;
+      cell.addEventListener("click", () => placeQueen(i));
+      board.appendChild(cell);
+    }
+
+    function placeQueen(index) {
+      const row = Math.floor(index / 8);
+      const col = index % 8;
+
+      if (queens.some(q => q.row === row && q.col === col)) return;
+      queens.push({ row, col });
+      updateBoard();
+    }
+
+    function updateBoard() {
+      document.querySelectorAll(".cell").forEach(c => c.className = "cell");
+      queens.forEach(q => {
+        const idx = q.row * 8 + q.col;
+        document.querySelector(`[data-index='${idx}']`).classList.add("queen");
+      });
+
+      queens.forEach(q => {
+        for (let i = 0; i < 8; i++) {
+          mark(q.row * 8 + i); // linha
+          mark(i * 8 + q.col); // coluna
+          markDiagonal(q, i);
+        }
+      });
+
+      if (queens.length === 8) statusDiv.textContent = "✅ Você completou o desafio!";
+      else statusDiv.textContent = `♛ ${queens.length}/8 rainhas colocadas.`;
+    }
+
+    function markDiagonal(q, i) {
+      const d1 = (q.row + i) * 8 + (q.col + i);
+      const d2 = (q.row - i) * 8 + (q.col - i);
+      const d3 = (q.row + i) * 8 + (q.col - i);
+      const d4 = (q.row - i) * 8 + (q.col + i);
+      [d1, d2, d3, d4].forEach(idx => mark(idx));
+    }
+
+    function mark(idx) {
+      if (idx >= 0 && idx < 64) {
+        const cell = document.querySelector(`[data-index='${idx}']`);
+        if (cell && !cell.classList.contains("queen")) cell.classList.add("blocked");
+      }
+    }
+
+    document.getElementById("mintBtn").onclick = async () => {
+      if (queens.length < 8) {
+        alert("Coloque todas as 8 rainhas antes de mintar!");
+        return;
+      }
+
+      try {
+        const provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        const signer = provider.getSigner();
+        const contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        const address = await signer.getAddress();
+
+        const tokenURI = JSON.stringify({
+          player: address,
+          timestamp: new Date().toISOString(),
+          message: "Eight Queens Challenge completed!"
+        });
+
+        statusDiv.textContent = "⏳ Assinando transação...";
+        const tx = await contract.mintScore(tokenURI);
+        await tx.wait();
+        statusDiv.textContent = `✅ NFT mintado com sucesso! Tx: ${tx.hash}`;
+      } catch (err) {
+        console.error(err);
+        statusDiv.textContent = `❌ Erro: ${err.message}`;
+      }
+    };
+  </script>
+</body>
+</html>
